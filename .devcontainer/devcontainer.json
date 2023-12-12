@@ -1,0 +1,21 @@
+{
+    "name": "Python and Node.js",
+    "context": "..",
+    "dockerFile": "dockerfile",
+    "customizations":{
+        "vscode":{
+            "settings": { 
+                "terminal.integrated.shell.linux": "/bin/bash"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-azuretools.vscode-docker",
+                "amazonwebservices.aws-toolkit-vscode",
+            ],
+        }
+    },
+    "forwardPorts": [3000],
+	"postCreateCommand": ["/bin/sh", "-c", "whoami && pwd && chmod 777 ./.devcontainer/postCreateCommand.sh && ./.devcontainer/postCreateCommand.sh"],
+	"postStartCommand": ["/bin/sh", "-c", "whoami && pwd && chmod 777 ./.devcontainer/postStartCommand.sh && ./.devcontainer/postStartCommand.sh"],
+    "remoteUser": "vscode"
+}
