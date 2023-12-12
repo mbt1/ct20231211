@@ -56,6 +56,6 @@ resource "aws_s3_bucket_policy" "bucket_policy" {
   })
 }
 
-output "bucket_url" {
-  value = aws_s3_bucket.staging_bucket.bucket_domain_name
-}
+output "staging_bucket_url" {value = aws_s3_bucket.staging_bucket.bucket_domain_name}
+output "staging_bucket_arn" {value = aws_s3_bucket.staging_bucket.arn}
+output "staging_bucket_name" {value = local.staging_bucket_name}
