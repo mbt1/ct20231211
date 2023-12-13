@@ -8,10 +8,10 @@ Resources:
     Properties:
       Handler: productivity.main
       Runtime: python3.11
-      CodeUri: .
+      CodeUri: ./productivity
       Description: Function to refresh input files for productivity data.
       MemorySize: 128
-      Timeout: 60
+      Timeout: 120
       Events:
         ScheduleEvent:
           Type: Schedule
