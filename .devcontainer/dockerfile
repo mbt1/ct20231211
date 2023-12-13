@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:bullseye
+FROM mcr.microsoft.com/devcontainers/python:3.11-bullseye
 
 WORKDIR /workspace
 
@@ -12,6 +12,21 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     unzip awscliv2.zip && \
     ./aws/install && \
     rm -rf awscliv2.zip ./aws
+
+# Download and install the AWS SAM CLI
+RUN curl -Lo sam-installation.sh https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip \
+    && unzip sam-installation.sh -d sam-installation \
+    && ./sam-installation/install \
+    && rm -rf sam-installation.sh sam-installation
+
+# Download and install the Docker CLI
+RUN apt-get update \
+    && apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
+    && add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli
+
 # Install Node.js
 # RUN apt-get update && apt-get install -y nodejs npm
 

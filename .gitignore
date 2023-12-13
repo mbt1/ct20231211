@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 .terraform/
 terraform.tfstate.backup
+.aws-sam/

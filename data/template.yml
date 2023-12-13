@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Function to refresh input files for productivity data.
+
+Resources:
+  ProductivityDataImport:
+    Type: AWS::Serverless::Function 
+    Properties:
+      Handler: productivity.main
+      Runtime: python3.11
+      CodeUri: .
+      Description: Function to refresh input files for productivity data.
+      MemorySize: 128
+      Timeout: 10
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(24 hour)
