@@ -11,7 +11,7 @@ Resources:
       CodeUri: .
       Description: Function to refresh input files for productivity data.
       MemorySize: 128
-      Timeout: 10
+      Timeout: 60
       Events:
         ScheduleEvent:
           Type: Schedule

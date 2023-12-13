@@ -87,8 +87,8 @@ def copy_files_to_s3(file_list, bucket_name, url_base):
         file_url = url_base + file['link']
         file_name = file['name']
         print(f"Reading {file_name} from {file_url}...")
-        if random.choice([True, False]):
-            continue
+        # if random.choice([True, False]):
+        #     continue
         http_response = read_from_url(file_url)
         # http_response = type('DataObject', (object,), {"status_code":200,"content":"lorem ipsum".encode('utf-8') })()
         if http_response.status_code == 200:
@@ -100,7 +100,7 @@ def copy_files_to_s3(file_list, bucket_name, url_base):
     return pd.DataFrame(written_files)
 
 
-def main():
+def main(event, context):
     url_base = 'https://download.bls.gov'
     dir_url = url_base + '/pub/time.series/pr/'
     bucket_name = 'ct20231211-staging'  
@@ -124,4 +124,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main({},type('DataObject', (object,), {})())
