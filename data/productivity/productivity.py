@@ -99,8 +99,7 @@ def copy_files_to_s3(file_list, bucket_name, url_base):
             print(f"-->Download failed. (Status Code = {http_response.status_code})")
     return pd.DataFrame(written_files)
 
-
-def main(event, context):
+def synch_bls_data():
     url_base = 'https://download.bls.gov'
     dir_url = url_base + '/pub/time.series/pr/'
     bucket_name = 'ct20231211-staging'  
@@ -121,6 +120,21 @@ def main(event, context):
     print("New State:")
     print(combined_files)
     set_state(bucket_name, state_key, combined_files)
+
+def load_population_data():
+    url = "https://datausa.io/api/data?drilldowns=Nation&measures=Population"
+    bucket_name = 'ct20231211-staging'
+
+    response = requests.get(url)
+    response.raise_for_status()
+    print(response.text)
+    write_s3_bucket(bucket_name, "us-population.json", response.text)
+    return
+
+def main(event, context):  
+    synch_bls_data()
+    load_population_data()
+    return
 
 
 if __name__ == "__main__":
