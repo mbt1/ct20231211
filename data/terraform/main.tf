@@ -5,9 +5,10 @@
 locals {
   current_timestamp     = formatdate("YYYY-MM-DD HH:mm:ss", timestamp())
   resource_prefix       = "ct20231211"
+  container-image-name  = "${local.resource_prefix}-ecs-image"
   application_name      = "${local.resource_prefix}"
   staging_bucket_name   = "${local.resource_prefix}-staging"
-  report_bucket_name   = "${local.resource_prefix}-reports"
+  report_bucket_name    = "${local.resource_prefix}-reports"
   common_tags           = {
                             Project = "${local.resource_prefix}"
                             Created = "${local.current_timestamp}"
@@ -192,6 +193,177 @@ resource "aws_lambda_permission" "allow_cloudwatch_to_invoke_productivity_lambda
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.productivity_lambda_schedule.arn
 }
+
+#---------------------------------------------------------------------------------------------
+#---- Set up ECS Cluster
+#---------------------------------------------------------------------------------------------
+
+resource "aws_ecr_repository" "ecr_repository" {
+  name                 = "ct20231211-ecr-repository"
+  image_tag_mutability = "MUTABLE"  
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+resource "aws_ecs_cluster" "ecs_cluster" {
+  name = "ct20231211-ecs-cluster"
+}
+
+resource "aws_ecs_task_definition" "ecs_task" {
+  family                   = "my-ecs-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "my-ecs-container",
+      image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${local.container-image-name}:latest",
+    }
+  ])
+}
+
+resource "aws_iam_role" "ecs_execution_role" {
+  name = "ecs_execution_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy" {
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+resource "aws_iam_policy" "ecs_s3_policy" {
+  name        = "ecs_s3_policy"
+  description = "IAM policy for ecs to access S3 bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket",
+        ],
+        Resource = [
+          "${aws_s3_bucket.report_bucket.arn}",
+          "${aws_s3_bucket.report_bucket.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "attach_ecs_s3_policy" {
+  role       = aws_iam_role.ecs_execution_role.name
+  policy_arn = aws_iam_policy.ecs_s3_policy.arn
+}
+
+resource "aws_vpc" "ecs_vpc" {
+  cidr_block = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "my-vpc"
+  }
+}
+resource "aws_internet_gateway" "ecs_igw" {
+  vpc_id = aws_vpc.ecs_vpc.id
+
+  tags = {
+    Name = "my-internet-gateway"
+  }
+}
+resource "aws_subnet" "ecs_subnet" {
+  vpc_id                  = aws_vpc.ecs_vpc.id
+  cidr_block              = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "my-public-subnet"
+  }
+}
+resource "aws_route_table" "ecs_route_table" {
+  vpc_id = aws_vpc.ecs_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.ecs_igw.id
+  }
+
+  tags = {
+    Name = "my-route-table"
+  }
+}
+resource "aws_route_table_association" "ecs_route_table_association" {
+  subnet_id      = aws_subnet.ecs_subnet.id
+  route_table_id = aws_route_table.ecs_route_table.id
+}
+resource "aws_security_group" "ecs_sg" {
+  name        = "my-security-group"
+  description = "Security group for ECS task"
+  vpc_id      = aws_vpc.ecs_vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "my-security-group"
+  }
+}
+
+
+/*
+resource "aws_lambda_function" "trigger_ecs_lambda" {
+  // Lambda function configuration...
+  environment {
+    variables = {
+      ECS_CLUSTER_NAME    = aws_ecs_cluster.ecs_cluster.name
+      ECS_TASK_DEFINITION = aws_ecs_task_definition.ecs_task.arn
+    }
+  }
+}
+
+// IAM role and policy for Lambda to interact with ECS and SQS
+resource "aws_iam_role" "lambda_iam_role" {
+  // IAM role configuration...
+}
+
+resource "aws_iam_role_policy" "lambda_policy" {
+  // IAM policy allowing Lambda to start ECS task and read from SQS
+}
+
+resource "aws_sqs_queue" "ecs_queue" {
+  // SQS queue configuration...
+}
+
+resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  event_source_arn = aws_sqs_queue.ecs_queue.arn
+  function_name    = aws_lambda_function.trigger_ecs_lambda.arn
+}
+*/
+
 #---------------------------------------------------------------------------------------------
 #---- Print Output Values
 #---------------------------------------------------------------------------------------------
