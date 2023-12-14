@@ -145,7 +145,7 @@ resource "aws_lambda_function" "productivity_lambda" {
 resource "aws_cloudwatch_event_rule" "productivity_lambda_schedule" {
   name                = "productivity-lambda-schedule-rule"
   description         = "Trigger ProductivityDataImport on a schedule"
-  schedule_expression = "rate(5 minutes)"  
+  schedule_expression = "rate(6 hours)"  
 }
 resource "aws_cloudwatch_event_target" "productivity_lambda_target" {
   rule = aws_cloudwatch_event_rule.productivity_lambda_schedule.name
