@@ -19,6 +19,8 @@ RUN curl -Lo sam-installation.sh https://github.com/aws/aws-sam-cli/releases/lat
     && ./sam-installation/install \
     && rm -rf sam-installation.sh sam-installation
 
+RUN pip install notebook
+
 # Install Node.js
 # RUN apt-get update && apt-get install -y nodejs npm
 
