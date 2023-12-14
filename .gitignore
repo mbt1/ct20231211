@@ -163,3 +163,4 @@ terraform.tfstate.backup
 .aws-sam/
 .DS_Store
 .Trash-1000/
+.ipynb_checkpoints/
