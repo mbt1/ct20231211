@@ -12,8 +12,3 @@ Resources:
       Description: Function to refresh input files for productivity data.
       MemorySize: 128
       Timeout: 120
-      Events:
-        ScheduleEvent:
-          Type: Schedule
-          Properties:
-            Schedule: rate(24 hour)

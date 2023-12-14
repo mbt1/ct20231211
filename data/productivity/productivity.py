@@ -5,7 +5,7 @@ import pandas as pd
 import re
 import boto3
 from io import StringIO, BytesIO
-import json
+from get_secret import get_secret
 import time
 import random
 
@@ -14,7 +14,7 @@ def read_from_url(url):
     # launchctl setenv CT20231211_CONTACT_EMAIL your_email_address
     
     time.sleep(1)
-    contact_email = os.environ.get("CT20231211_CONTACT_EMAIL");
+    contact_email = get_secret("CT20231211_CONTACT_EMAIL")
     headers = {
         "User-Agent": f"ct20231211 ({contact_email})"
     }   
