@@ -1,0 +1,5 @@
+jupyter
+nbconvert
+pandas
+boto3
+requests

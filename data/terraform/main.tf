@@ -7,6 +7,7 @@ locals {
   resource_prefix       = "ct20231211"
   application_name      = "${local.resource_prefix}"
   staging_bucket_name   = "${local.resource_prefix}-staging"
+  report_bucket_name   = "${local.resource_prefix}-reports"
   common_tags           = {
                             Project = "${local.resource_prefix}"
                             Created = "${local.current_timestamp}"
@@ -29,7 +30,6 @@ provider "aws" {
 #---- staging_bucket: S3 Bucket
 #---------------------------------------------------------------------------------------------
 
-# Create an S3 bucket
 resource "aws_s3_bucket" "staging_bucket" {
   bucket = local.staging_bucket_name
   tags = local.common_tags
@@ -42,7 +42,7 @@ resource "aws_s3_bucket_public_access_block" "staging_bucket_public_access_block
   ignore_public_acls      = false
   restrict_public_buckets = false
 }
-resource "aws_s3_bucket_policy" "bucket_policy" {
+resource "aws_s3_bucket_policy" "staging_bucket_policy" {
   bucket = aws_s3_bucket.staging_bucket.id
 
   policy = jsonencode({
@@ -54,6 +54,40 @@ resource "aws_s3_bucket_policy" "bucket_policy" {
         Principal = "*"
         Action    = "s3:GetObject"
         Resource = "arn:aws:s3:::${aws_s3_bucket.staging_bucket.id}/*"  
+      },
+    ]
+  })
+}
+
+
+#---------------------------------------------------------------------------------------------
+#---- report_bucket: S3 Bucket
+#---------------------------------------------------------------------------------------------
+
+resource "aws_s3_bucket" "report_bucket" {
+  bucket = local.report_bucket_name
+  tags = local.common_tags
+}
+resource "aws_s3_bucket_public_access_block" "report_bucket_public_access_block" {
+  bucket = aws_s3_bucket.report_bucket.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+resource "aws_s3_bucket_policy" "report_bucket_policy" {
+  bucket = aws_s3_bucket.report_bucket.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource = "arn:aws:s3:::${aws_s3_bucket.report_bucket.id}/*"  
       },
     ]
   })
