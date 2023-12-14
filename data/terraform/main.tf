@@ -137,7 +137,7 @@ resource "aws_lambda_function" "productivity_lambda" {
   role             = aws_iam_role.productivity_iam_role.arn
   handler          = "productivity.main"
   runtime          = "python3.11"  # Match your runtime
-  timeout          = 120
+  timeout          = 300
 
   filename         = "${path.module}/../.aws-sam/ProductivityDataImport.zip"
   source_code_hash = filebase64sha256("${path.module}/../.aws-sam/ProductivityDataImport.zip")
@@ -145,14 +145,19 @@ resource "aws_lambda_function" "productivity_lambda" {
 resource "aws_cloudwatch_event_rule" "productivity_lambda_schedule" {
   name                = "productivity-lambda-schedule-rule"
   description         = "Trigger ProductivityDataImport on a schedule"
-  schedule_expression = "rate(6 hours)"  
+  schedule_expression = "rate(5 minutes)"  
 }
 resource "aws_cloudwatch_event_target" "productivity_lambda_target" {
   rule = aws_cloudwatch_event_rule.productivity_lambda_schedule.name
   arn  = aws_lambda_function.productivity_lambda.arn
 }
-
-
+resource "aws_lambda_permission" "allow_cloudwatch_to_invoke_productivity_lambda" {
+  statement_id  = "AllowProductivityDataImportExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.productivity_lambda.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.productivity_lambda_schedule.arn
+}
 #---------------------------------------------------------------------------------------------
 #---- Print Output Values
 #---------------------------------------------------------------------------------------------
