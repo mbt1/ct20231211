@@ -403,21 +403,25 @@ resource "aws_lambda_function" "sqslistener_lambda" {
   }
 }
 
+#---------------------------------------------------------------------------------------------
+#---- Build and Push Docker Image for ECS Task
+#---------------------------------------------------------------------------------------------
+
+resource "null_resource" "push_ecs_docker_image" {
+  depends_on = [aws_ecr_repository.ecr_repository]
+
+  provisioner "local-exec" {
+    command = "${path.module}/PushECSDockerImage.sh ${aws_ecr_repository.ecr_repository.repository_url}"
+  }
+}
+
 
 
 #------------------------------------------------------------------------------------
 /*
-resource "aws_lambda_function" "trigger_ecs_lambda" {
-  // Lambda function configuration...
-  environment {
-    variables = {
-      TF_VAR_ECS_CLUSTER_NAME    = aws_ecs_cluster.ecs_cluster.name
-      TF_VAR_ECS_TASK_DEFINITION = aws_ecs_task_definition.ecs_task.arn
-      TF_VAR_ECS_SUBNET_ID                = aws_subnet.ecs_subnet.id
-      TF_VAR_ECS_SECURITY_GROUP_ID        = aws_security_group.ecs_sg.id
-      TF_VAR_ECS_SUBNET_MAP_PUBLIC_IP     = tostring(aws_subnet.ecs_subnet.map_public_ip_on_launch)
-    }
-  }
+
+resource "aws_sqs_queue" "ecs_queue" {
+  // SQS queue configuration...
 }
 
 // IAM role and policy for Lambda to interact with ECS and SQS
@@ -427,10 +431,6 @@ resource "aws_iam_role" "lambda_iam_role" {
 
 resource "aws_iam_role_policy" "lambda_policy" {
   // IAM policy allowing Lambda to start ECS task and read from SQS
-}
-
-resource "aws_sqs_queue" "ecs_queue" {
-  // SQS queue configuration...
 }
 
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
@@ -451,3 +451,4 @@ output ECS_TASK_DEFINITION {value = aws_ecs_task_definition.ecs_task.arn}
 output ECS_SUBNET_ID {value = aws_subnet.ecs_subnet.id}
 output ECS_SECURITY_GROUP_ID {value = aws_security_group.ecs_sg.id}
 output ECS_SUBNET_MAP_PUBLIC_IP {value = aws_subnet.ecs_subnet.map_public_ip_on_launch}
+output "ECR_REPOSITORY_URL" {value = "${aws_ecr_repository.ecr_repository.repository_url}"}
