@@ -126,7 +126,7 @@ resource "aws_iam_policy" "productivity_secrets_policy" {
       {
         Action = "secretsmanager:GetSecretValue",
         Effect = "Allow",
-        Resource = "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:CT20231211_*"
+        Resource = "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${local.resource_prefix}_*"
       }
     ]
   })
@@ -199,7 +199,7 @@ resource "aws_lambda_permission" "allow_cloudwatch_to_invoke_productivity_lambda
 #---------------------------------------------------------------------------------------------
 
 resource "aws_ecr_repository" "ecr_repository" {
-  name                 = "ct20231211-ecr-repository"
+  name                 = "${local.resource_prefix}-ecr-repository"
   image_tag_mutability = "MUTABLE"  
 
   image_scanning_configuration {
@@ -208,11 +208,11 @@ resource "aws_ecr_repository" "ecr_repository" {
 }
 
 resource "aws_ecs_cluster" "ecs_cluster" {
-  name = "ct20231211-ecs-cluster"
+  name = "${local.resource_prefix}-ecs-cluster"
 }
 
 resource "aws_ecs_task_definition" "ecs_task" {
-  family                   = "my-ecs-task"
+  family                   = "${local.resource_prefix}-ecs-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -221,7 +221,7 @@ resource "aws_ecs_task_definition" "ecs_task" {
 
   container_definitions = jsonencode([
     {
-      name  = "my-ecs-container",
+      name  = "${local.resource_prefix}-ecs-container",
       image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${local.container-image-name}:latest",
     }
   ])
@@ -281,14 +281,14 @@ resource "aws_vpc" "ecs_vpc" {
   enable_dns_hostnames = true
 
   tags = {
-    Name = "my-vpc"
+    Name = "${local.resource_prefix}-ecs-vpc"
   }
 }
 resource "aws_internet_gateway" "ecs_igw" {
   vpc_id = aws_vpc.ecs_vpc.id
 
   tags = {
-    Name = "my-internet-gateway"
+    Name = "${local.resource_prefix}-ecs-internet-gateway"
   }
 }
 resource "aws_subnet" "ecs_subnet" {
@@ -297,7 +297,7 @@ resource "aws_subnet" "ecs_subnet" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "my-public-subnet"
+    Name = "${local.resource_prefix}-ecs-public-subnet"
   }
 }
 resource "aws_route_table" "ecs_route_table" {
@@ -309,7 +309,7 @@ resource "aws_route_table" "ecs_route_table" {
   }
 
   tags = {
-    Name = "my-route-table"
+    Name = "${local.resource_prefix}-ecs-route-table"
   }
 }
 resource "aws_route_table_association" "ecs_route_table_association" {
@@ -317,7 +317,7 @@ resource "aws_route_table_association" "ecs_route_table_association" {
   route_table_id = aws_route_table.ecs_route_table.id
 }
 resource "aws_security_group" "ecs_sg" {
-  name        = "my-security-group"
+  name        = "${local.resource_prefix}-ecs-security-group"
   description = "Security group for ECS task"
   vpc_id      = aws_vpc.ecs_vpc.id
 
@@ -329,18 +329,93 @@ resource "aws_security_group" "ecs_sg" {
   }
 
   tags = {
-    Name = "my-security-group"
+    Name = "${local.resource_prefix}-ecs-security-group"
+  }
+}
+
+#---------------------------------------------------------------------------------------------
+#---- Set up SQSListener lambda function
+#---------------------------------------------------------------------------------------------
+
+resource "aws_iam_role" "sqslistener_iam_role" {
+  name = "sqslistener_iam_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        },
+      },
+    ],
+  })
+}
+resource "aws_iam_policy" "sqslistener_s3_policy" {
+  name        = "sqslistener_s3_policy"
+  description = "IAM policy for Lambda to access S3 bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket",
+        ],
+        Resource = [
+          "${aws_s3_bucket.staging_bucket.arn}",
+          "${aws_s3_bucket.staging_bucket.arn}/*",
+          "${aws_s3_bucket.report_bucket.arn}",
+          "${aws_s3_bucket.report_bucket.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "attach_sqslistener_s3_policy" {
+  role       = aws_iam_role.sqslistener_iam_role.name
+  policy_arn = aws_iam_policy.sqslistener_s3_policy.arn
+}
+resource "aws_iam_role_policy_attachment" "attach_sqslistener_lambda_policy" {
+  role       = aws_iam_role.sqslistener_iam_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+resource "aws_lambda_function" "sqslistener_lambda" {
+  function_name    = "SQSListener"
+  role             = aws_iam_role.sqslistener_iam_role.arn
+  handler          = "sqs-listener.main"
+  runtime          = "python3.11"  # Match your runtime
+  timeout          = 10
+
+  filename         = "${path.module}/../.aws-sam/SQSListener.zip"
+  source_code_hash = filebase64sha256("${path.module}/../.aws-sam/SQSListener.zip")
+  environment {
+    variables = {
+      TF_VAR_ECS_CLUSTER_NAME    = aws_ecs_cluster.ecs_cluster.name
+      TF_VAR_ECS_TASK_DEFINITION = aws_ecs_task_definition.ecs_task.arn
+    }
   }
 }
 
 
+
+#------------------------------------------------------------------------------------
 /*
 resource "aws_lambda_function" "trigger_ecs_lambda" {
   // Lambda function configuration...
   environment {
     variables = {
-      ECS_CLUSTER_NAME    = aws_ecs_cluster.ecs_cluster.name
-      ECS_TASK_DEFINITION = aws_ecs_task_definition.ecs_task.arn
+      TF_VAR_ECS_CLUSTER_NAME    = aws_ecs_cluster.ecs_cluster.name
+      TF_VAR_ECS_TASK_DEFINITION = aws_ecs_task_definition.ecs_task.arn
+      TF_VAR_ECS_SUBNET_ID                = aws_subnet.ecs_subnet.id
+      TF_VAR_ECS_SECURITY_GROUP_ID        = aws_security_group.ecs_sg.id
+      TF_VAR_ECS_SUBNET_MAP_PUBLIC_IP     = tostring(aws_subnet.ecs_subnet.map_public_ip_on_launch)
     }
   }
 }
@@ -371,3 +446,8 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger" {
 output "staging_bucket_url" {value = aws_s3_bucket.staging_bucket.bucket_domain_name}
 output "staging_bucket_arn" {value = aws_s3_bucket.staging_bucket.arn}
 output "staging_bucket_name" {value = local.staging_bucket_name}
+output ECS_CLUSTER_NAME {value = aws_ecs_cluster.ecs_cluster.name}
+output ECS_TASK_DEFINITION {value = aws_ecs_task_definition.ecs_task.arn}
+output ECS_SUBNET_ID {value = aws_subnet.ecs_subnet.id}
+output ECS_SECURITY_GROUP_ID {value = aws_security_group.ecs_sg.id}
+output ECS_SUBNET_MAP_PUBLIC_IP {value = aws_subnet.ecs_subnet.map_public_ip_on_launch}

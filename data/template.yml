@@ -1,6 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Function to refresh input files for productivity data.
+Description: Functions for the CT20231211 project.
+
+Parameters:
+  ParEcsClusterName:
+    Type: String
+  ParEcsTaskDefinition:
+    Type: String
+  ParEcsSubnetId:
+    Type: String
+  ParEcsSecurityGroupId:
+    Type: String
+  ParEcsSubnetMapPublicIp:
+    Type: String
 
 Resources:
   ProductivityDataImport:
@@ -12,3 +24,19 @@ Resources:
       Description: Function to refresh input files for productivity data.
       MemorySize: 128
       Timeout: 120
+  SQSListener:
+    Type: AWS::Serverless::Function 
+    Properties:
+      Handler: sqs-listener.main
+      Runtime: python3.11
+      CodeUri: ./sqslistener
+      Description: Function to refresh input files for productivity data.
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          TF_VAR_ECS_CLUSTER_NAME: !Ref ParEcsClusterName
+          TF_VAR_ECS_TASK_DEFINITION: !Ref ParEcsTaskDefinition
+          TF_VAR_ECS_SUBNET_ID: !Ref ParEcsSubnetId
+          TF_VAR_ECS_SECURITY_GROUP_ID: !Ref ParEcsSecurityGroupId
+          TF_VAR_ECS_SUBNET_MAP_PUBLIC_IP: !Ref ParEcsSubnetMapPublicIp
