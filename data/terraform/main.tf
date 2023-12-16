@@ -244,6 +244,22 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy" {
   role       = aws_iam_role.ecs_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
+resource "aws_iam_role" "ecs_task_role" {
+  name = "ecs_task_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
 resource "aws_iam_policy" "ecs_s3_policy" {
   name        = "ecs_s3_policy"
   description = "IAM policy for ecs to access S3 bucket"
@@ -269,7 +285,7 @@ resource "aws_iam_policy" "ecs_s3_policy" {
   })
 }
 resource "aws_iam_role_policy_attachment" "attach_ecs_s3_policy" {
-  role       = aws_iam_role.ecs_execution_role.name
+  role       = aws_iam_role.ecs_task_role.name
   policy_arn = aws_iam_policy.ecs_s3_policy.arn
 }
 
@@ -279,6 +295,7 @@ resource "aws_ecs_task_definition" "ecs_task" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
   memory                   = "512"
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
   execution_role_arn       = aws_iam_role.ecs_execution_role.arn
 
   container_definitions = jsonencode([
@@ -408,6 +425,7 @@ resource "aws_iam_policy" "sqslistener_ecs_execution_role_policy" {
         ],
         Resource = [
           "${aws_iam_role.ecs_execution_role.arn}",
+          "${aws_iam_role.ecs_task_role.arn}",
         ]
       }
     ]
