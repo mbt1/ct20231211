@@ -204,7 +204,7 @@ resource "aws_lambda_permission" "allow_cloudwatch_to_invoke_productivity_lambda
 #---------------------------------------------------------------------------------------------
 
 resource "aws_ecr_repository" "ecr_repository" {
-  name                 = "${local.resource_prefix}-ecr-repository"
+  name                 = "${local.container-image-name}"
   image_tag_mutability = "MUTABLE"  
 
   image_scanning_configuration {
@@ -453,6 +453,9 @@ resource "aws_lambda_function" "sqslistener_lambda" {
 
 resource "null_resource" "push_ecs_docker_image" {
   depends_on = [aws_ecr_repository.ecr_repository]
+  triggers = {
+    always_run = "${timestamp()}"
+  }
 
   provisioner "local-exec" {
     command = "${path.module}/PushECSDockerImage.sh ${aws_ecr_repository.ecr_repository.repository_url}"
