@@ -5,7 +5,7 @@
 locals {
   current_timestamp     = formatdate("YYYY-MM-DD HH:mm:ss", timestamp())
   resource_prefix       = "ct20231211"
-  container-image-name  = "${local.resource_prefix}-ecs-image"
+  container-image-name  = "ct20231211-reports"
   application_name      = "${local.resource_prefix}"
   staging_bucket_name   = "${local.resource_prefix}-staging"
   report_bucket_name    = "${local.resource_prefix}-reports"
@@ -19,12 +19,17 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
     }
+    docker = {
+      source  = "kreuzwerker/docker"
+    }
   }
 }
 
 # Configure the AWS Provider
 provider "aws" {
   region = "us-east-1"
+}
+provider "docker" {
 }
 
 #---------------------------------------------------------------------------------------------
@@ -211,6 +216,13 @@ resource "aws_ecs_cluster" "ecs_cluster" {
   name = "${local.resource_prefix}-ecs-cluster"
 }
 
+resource "aws_cloudwatch_log_group" "ecs_logs" {
+  name = "ecs-logs"
+
+  tags = {
+    Application = "${local.resource_prefix}"
+  }
+}
 resource "aws_ecs_task_definition" "ecs_task" {
   family                   = "${local.resource_prefix}-ecs-task"
   network_mode             = "awsvpc"
@@ -223,6 +235,14 @@ resource "aws_ecs_task_definition" "ecs_task" {
     {
       name  = "${local.resource_prefix}-ecs-container",
       image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${local.container-image-name}:latest",
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs_logs.name
+          awslogs-region        = "${data.aws_region.current.name}"
+          awslogs-stream-prefix = "ecs"
+        }
+      },
     }
   ])
 }
@@ -407,6 +427,30 @@ resource "aws_lambda_function" "sqslistener_lambda" {
 #---- Build and Push Docker Image for ECS Task
 #---------------------------------------------------------------------------------------------
 
+/*-----------------------------------------------
+# Unclear how to authenticate in this scenario... disabling it
+#------------------------------------------------
+    resource "null_resource" "docker_ecr_login" {
+      depends_on = [aws_ecr_repository.ecr_repository]
+
+      provisioner "local-exec" {
+        command = "aws ecr get-login-password --region ${data.aws_region.current.name} | docker login --username AWS --password-stdin ${aws_ecr_repository.ecr_repository.repository_url}"
+      }
+    }
+    resource "docker_image" "ecs_docker_image" {
+      depends_on    = [null_resource.docker_ecr_login]
+      name = "${aws_ecr_repository.ecr_repository.repository_url}:latest"
+      build {
+        context    = "${path.module}/../reports/docker"
+        build_args = {}
+      }
+    }
+    resource "docker_registry_image" "registry_ecs_docker_image" {
+      name          = docker_image.ecs_docker_image.name
+      keep_remotely = true
+    }
+*/
+
 resource "null_resource" "push_ecs_docker_image" {
   depends_on = [aws_ecr_repository.ecr_repository]
 
@@ -414,7 +458,6 @@ resource "null_resource" "push_ecs_docker_image" {
     command = "${path.module}/PushECSDockerImage.sh ${aws_ecr_repository.ecr_repository.repository_url}"
   }
 }
-
 
 
 #------------------------------------------------------------------------------------
