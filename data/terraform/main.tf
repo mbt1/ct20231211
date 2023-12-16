@@ -131,7 +131,7 @@ resource "aws_iam_policy" "productivity_secrets_policy" {
       {
         Action = "secretsmanager:GetSecretValue",
         Effect = "Allow",
-        Resource = "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${local.resource_prefix}_*"
+        Resource = "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${upper(local.resource_prefix)}_*"
       }
     ]
   })
@@ -373,6 +373,42 @@ resource "aws_security_group" "ecs_sg" {
 }
 
 #---------------------------------------------------------------------------------------------
+#---- Set up SQS Queue
+#---------------------------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "staging_notification_queue_policy" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions   = ["sqs:SendMessage"]
+    resources = ["arn:aws:sqs:*:*:staging_file_change_notification_queue"]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.staging_bucket.arn]
+    }
+  }
+}
+resource "aws_sqs_queue" "staging_file_change_notification_queue" {
+  name = "staging_file_change_notification_queue"
+  policy = data.aws_iam_policy_document.staging_notification_queue_policy.json
+}
+resource "aws_s3_bucket_notification" "bucket_notification" {
+  bucket = aws_s3_bucket.staging_bucket.id
+
+  queue {
+    queue_arn     = aws_sqs_queue.staging_file_change_notification_queue.arn
+    events        = ["s3:ObjectCreated:Put","s3:ObjectCreated:Post"]
+  }
+}
+
+#---------------------------------------------------------------------------------------------
 #---- Set up SQSListener lambda function
 #---------------------------------------------------------------------------------------------
 
@@ -392,6 +428,22 @@ resource "aws_iam_role" "sqslistener_iam_role" {
     ],
   })
 }
+resource "aws_iam_policy" "sqslistener_sqs_policy" {
+  name        = "sqslistener_sqs_policy"
+  description = "IAM policy for SQSListener Lambda to access SQS queue"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
+        Resource = aws_sqs_queue.staging_file_change_notification_queue.arn
+      }
+    ]
+  })
+}
+
 resource "aws_iam_policy" "sqslistener_ecs_policy" {
   name        = "sqslistener_ecs_policy"
   description = "IAM policy for Lambda to access ecs task"
@@ -431,6 +483,10 @@ resource "aws_iam_policy" "sqslistener_ecs_execution_role_policy" {
     ]
   })
 }
+resource "aws_iam_role_policy_attachment" "attach_sqslistener_sqs_policy" {
+  role       = aws_iam_role.sqslistener_iam_role.name
+  policy_arn = aws_iam_policy.sqslistener_sqs_policy.arn
+}
 resource "aws_iam_role_policy_attachment" "attach_sqslistener_ecs_execution_role_policy" {
   role       = aws_iam_role.sqslistener_iam_role.name
   policy_arn = aws_iam_policy.sqslistener_ecs_execution_role_policy.arn
@@ -461,6 +517,11 @@ resource "aws_lambda_function" "sqslistener_lambda" {
       TF_VAR_ECS_SUBNET_MAP_PUBLIC_IP = aws_subnet.ecs_subnet.map_public_ip_on_launch
     }
   }
+}
+resource "aws_lambda_event_source_mapping" "lambda_trigger" {
+  event_source_arn = aws_sqs_queue.staging_file_change_notification_queue.arn
+  function_name    = aws_lambda_function.sqslistener_lambda.arn
+  batch_size       = 1
 }
 
 #---------------------------------------------------------------------------------------------
@@ -501,6 +562,14 @@ resource "null_resource" "push_ecs_docker_image" {
     command = "${path.module}/PushECSDockerImage.sh ${aws_ecr_repository.ecr_repository.repository_url}"
   }
 }
+
+
+
+
+
+
+
+
 
 
 #------------------------------------------------------------------------------------
