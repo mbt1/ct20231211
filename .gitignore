@@ -164,3 +164,4 @@ terraform.tfstate.backup
 .DS_Store
 .Trash-1000/
 .ipynb_checkpoints/
+node_modules/

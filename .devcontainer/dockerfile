@@ -22,6 +22,9 @@ RUN curl -Lo sam-installation.sh https://github.com/aws/aws-sam-cli/releases/lat
 RUN pip install notebook
 
 # Install Node.js
-# RUN apt-get update && apt-get install -y nodejs npm
-
+RUN apt-get update && apt-get install -y nodejs npm
+RUN npm install -g react react-dom 
+RUN npm install -g webpack webpack-dev-server webpack-cli
+RUN npm install -g babel-core babel-loader babel-preset-env babel-preset-react babel-webpack-plugin
+RUN npm install -g serve
  

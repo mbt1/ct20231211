@@ -74,6 +74,17 @@ resource "aws_s3_bucket" "report_bucket" {
   bucket = local.report_bucket_name
   tags = local.common_tags
 }
+resource "aws_s3_bucket_cors_configuration" "example" {
+  bucket = aws_s3_bucket.report_bucket.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET"]
+    allowed_origins = ["*"]
+    expose_headers  = []
+    max_age_seconds = 3000
+  }
+}
 resource "aws_s3_bucket_public_access_block" "report_bucket_public_access_block" {
   bucket = aws_s3_bucket.report_bucket.id
 
@@ -94,6 +105,13 @@ resource "aws_s3_bucket_policy" "report_bucket_policy" {
         Principal = "*"
         Action    = "s3:GetObject"
         Resource = "arn:aws:s3:::${aws_s3_bucket.report_bucket.id}/*"  
+      },
+      {
+        Sid       = "PublicListBucket"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:ListBucket"
+        Resource = "arn:aws:s3:::${aws_s3_bucket.report_bucket.id}"  
       },
     ]
   })
