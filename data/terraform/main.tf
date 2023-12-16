@@ -223,29 +223,6 @@ resource "aws_cloudwatch_log_group" "ecs_logs" {
     Application = "${local.resource_prefix}"
   }
 }
-resource "aws_ecs_task_definition" "ecs_task" {
-  family                   = "${local.resource_prefix}-ecs-task"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
-  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
-
-  container_definitions = jsonencode([
-    {
-      name  = "${local.resource_prefix}-ecs-container",
-      image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${local.container-image-name}:latest",
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.ecs_logs.name
-          awslogs-region        = "${data.aws_region.current.name}"
-          awslogs-stream-prefix = "ecs"
-        }
-      },
-    }
-  ])
-}
 
 resource "aws_iam_role" "ecs_execution_role" {
   name = "ecs_execution_role"
@@ -283,9 +260,10 @@ resource "aws_iam_policy" "ecs_s3_policy" {
           "s3:ListBucket",
         ],
         Resource = [
+          "${aws_s3_bucket.staging_bucket.arn}",
+          "${aws_s3_bucket.staging_bucket.arn}/*",
           "${aws_s3_bucket.report_bucket.arn}",
-          "${aws_s3_bucket.report_bucket.arn}/*"
-        ]
+          "${aws_s3_bucket.report_bucket.arn}/*"        ]
       }
     ]
   })
@@ -293,6 +271,30 @@ resource "aws_iam_policy" "ecs_s3_policy" {
 resource "aws_iam_role_policy_attachment" "attach_ecs_s3_policy" {
   role       = aws_iam_role.ecs_execution_role.name
   policy_arn = aws_iam_policy.ecs_s3_policy.arn
+}
+
+resource "aws_ecs_task_definition" "ecs_task" {
+  family                   = "${local.resource_prefix}-ecs-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_execution_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "${local.resource_prefix}-ecs-container",
+      image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${local.container-image-name}:latest",
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs_logs.name
+          awslogs-region        = "${data.aws_region.current.name}"
+          awslogs-stream-prefix = "ecs"
+        }
+      },
+    }
+  ])
 }
 
 resource "aws_vpc" "ecs_vpc" {
@@ -373,9 +375,9 @@ resource "aws_iam_role" "sqslistener_iam_role" {
     ],
   })
 }
-resource "aws_iam_policy" "sqslistener_s3_policy" {
-  name        = "sqslistener_s3_policy"
-  description = "IAM policy for Lambda to access S3 bucket"
+resource "aws_iam_policy" "sqslistener_ecs_policy" {
+  name        = "sqslistener_ecs_policy"
+  description = "IAM policy for Lambda to access ecs task"
 
   policy = jsonencode({
     Version = "2012-10-17",
@@ -383,24 +385,41 @@ resource "aws_iam_policy" "sqslistener_s3_policy" {
       {
         Effect = "Allow",
         Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket",
+          "ecs:RunTask",
         ],
         Resource = [
-          "${aws_s3_bucket.staging_bucket.arn}",
-          "${aws_s3_bucket.staging_bucket.arn}/*",
-          "${aws_s3_bucket.report_bucket.arn}",
-          "${aws_s3_bucket.report_bucket.arn}/*"
+          "${aws_ecs_task_definition.ecs_task.arn}",
         ]
       }
     ]
   })
 }
-resource "aws_iam_role_policy_attachment" "attach_sqslistener_s3_policy" {
+resource "aws_iam_policy" "sqslistener_ecs_execution_role_policy" {
+  name        = "sqslistener_ecs_execution_role_policy"
+  description = "IAM policy for Lambda to access ecs task"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "iam:PassRole",
+        ],
+        Resource = [
+          "${aws_iam_role.ecs_execution_role.arn}",
+        ]
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "attach_sqslistener_ecs_execution_role_policy" {
   role       = aws_iam_role.sqslistener_iam_role.name
-  policy_arn = aws_iam_policy.sqslistener_s3_policy.arn
+  policy_arn = aws_iam_policy.sqslistener_ecs_execution_role_policy.arn
+}
+resource "aws_iam_role_policy_attachment" "attach_sqslistener_ecs_policy" {
+  role       = aws_iam_role.sqslistener_iam_role.name
+  policy_arn = aws_iam_policy.sqslistener_ecs_policy.arn
 }
 resource "aws_iam_role_policy_attachment" "attach_sqslistener_lambda_policy" {
   role       = aws_iam_role.sqslistener_iam_role.name
@@ -417,8 +436,11 @@ resource "aws_lambda_function" "sqslistener_lambda" {
   source_code_hash = filebase64sha256("${path.module}/../.aws-sam/SQSListener.zip")
   environment {
     variables = {
-      TF_VAR_ECS_CLUSTER_NAME    = aws_ecs_cluster.ecs_cluster.name
-      TF_VAR_ECS_TASK_DEFINITION = aws_ecs_task_definition.ecs_task.arn
+      TF_VAR_ECS_CLUSTER_NAME         = aws_ecs_cluster.ecs_cluster.name
+      TF_VAR_ECS_TASK_DEFINITION      = aws_ecs_task_definition.ecs_task.arn
+      TF_VAR_ECS_SUBNET_ID            = aws_subnet.ecs_subnet.id
+      TF_VAR_ECS_SECURITY_GROUP_ID    = aws_security_group.ecs_sg.id
+      TF_VAR_ECS_SUBNET_MAP_PUBLIC_IP = aws_subnet.ecs_subnet.map_public_ip_on_launch
     }
   }
 }
