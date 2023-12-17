@@ -103,7 +103,12 @@ function App() {
             <option key={file} value={bucket_url+file}>{file}</option>
           ))}
         </select>
+      </div>
+      <div>
         <DisplayNotebook notebook={selectedFileURL} />
+      </div>
+      <div>
+        Download <a href={selectedFileURL}>{selectedFileURL.substring(bucket_url.length)}</a>.
       </div>
     </div>
   );

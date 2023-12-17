@@ -74,7 +74,7 @@ resource "aws_s3_bucket" "report_bucket" {
   bucket = local.report_bucket_name
   tags = local.common_tags
 }
-resource "aws_s3_bucket_cors_configuration" "example" {
+resource "aws_s3_bucket_cors_configuration" "report_bucket_cors_configuration" {
   bucket = aws_s3_bucket.report_bucket.id
 
   cors_rule {
