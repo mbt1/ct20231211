@@ -22,7 +22,18 @@ RUN curl -Lo sam-installation.sh https://github.com/aws/aws-sam-cli/releases/lat
 RUN pip install notebook
 
 # Install Node.js
-RUN apt-get update && apt-get install -y nodejs npm
+ENV NVM_DIR /usr/local/nvm
+ENV NODE_VERSION 20.10.0
+
+RUN mkdir -p $NVM_DIR
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
+    && . $NVM_DIR/nvm.sh \
+    && nvm install $NODE_VERSION \
+    && nvm alias default $NODE_VERSION \
+    && nvm use default
+ENV NODE_PATH $NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules
+ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
+
 RUN npm install -g react react-dom 
 RUN npm install -g webpack webpack-dev-server webpack-cli
 RUN npm install -g babel-core babel-loader babel-preset-env babel-preset-react babel-webpack-plugin
