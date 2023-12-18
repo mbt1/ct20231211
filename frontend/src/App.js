@@ -1,56 +1,8 @@
 import './App.css';
 import React,{useState, useEffect} from 'react';
-//import ViewNotebook from 'react-jupyter-notebook';
 import { JupyterNotebookViewer } from "react-jupyter-notebook-viewer";
 const bucket_url = 'https://ct20231211-reports.s3.amazonaws.com/'
 
-// function App() {
-//   // const [files, setFiles] = useState([]);
-//   // const [selectedFileURL, setSelectedFile] = useState('');
-//   const [notebookContent, setNotebookContent] = useState(null);
-
-//   useEffect(() => {
-//     const fetchFiles = async () => {
-//       try {
-//         const response = await fetch(bucket_url);
-//         const data = await response.text();
-//         const parser = new DOMParser();
-//         const xml = parser.parseFromString(data, "application/xml");
-//         const elements = xml.getElementsByTagName("Key");
-//         const fileNames = Array.from(elements).map(element => element.textContent).sort((a,b)=>b.localeCompare(a));
-//         const NotebookURL = bucket_url+fileNames[0]
-//         const response2 = await fetch(NotebookURL);
-//         const data2 = await response2.json();
-//         console.log(4,data2)
-//         setNotebookContent(NotebookURL);
-//       } catch (error) {
-//         console.error("Error fetching file list: ", error);
-//       }
-//     };
-  
-//     fetchFiles();
-//   }, []);
-  
-
-//   return (
-//     <div className="App">
-//       <header className="App-header">
-//         <h1>
-//           <img src={`${process.env.PUBLIC_URL}/logo192.png`} className="App-logo" alt="logo" />
-//           A simple .ipynb report viewer
-//         </h1>
-//       </header>
-//       <div>
-//         {/* <select value={selectedFileURL} onChange={handleFileChange}>
-//           {files.map(file => (
-//             <option key={file} value={bucket_url+file}>{file}</option>
-//           ))}
-//         </select> */}
-//         <DisplayNotebook notebook={notebookContent} />
-//       </div>
-//     </div>
-//   );
-// }
 function App() {
   const [files, setFiles] = useState([]);
   const [selectedFileURL, setSelectedFile] = useState('');
