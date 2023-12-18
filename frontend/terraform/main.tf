@@ -2,6 +2,16 @@ provider "aws" {
   region = "us-east-1" 
 }
 
+variable "github_repository_url" {
+  description = "URL of the GitHub repository"
+  type        = string
+  default     = "https://github.com/mbt1/ct20231211.git"
+}
+
+#---------------------------------------------------------------------------------------------
+#---- react_app: S3 Bucket for static website (the report viewer)
+#---------------------------------------------------------------------------------------------
+
 resource "aws_s3_bucket" "react_app" {
   bucket = "ct20231211-react-app-bucket" 
 }
@@ -67,7 +77,7 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
 
   # Default Cache Behavior
   default_cache_behavior {
-    allowed_methods  = ["GET", "HEAD"]
+    allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
     cached_methods   = ["GET", "HEAD"]
     target_origin_id = "S3-${aws_s3_bucket.react_app.id}"
 
@@ -91,6 +101,19 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   }
 }
 
-output "website_url" {
+#---------------------------------------------------------------------------------------------
+#---- provide output values
+#---------------------------------------------------------------------------------------------
+
+output "CLOUDFRONT_URL" {
   value = aws_cloudfront_distribution.s3_distribution.domain_name
+}
+output "CLOUDFRONT_ID" {
+  value = aws_cloudfront_distribution.s3_distribution.id
+}
+output "S3_WEBSITE_URL" {
+  value = "http://${aws_s3_bucket.react_app.id}.${aws_s3_bucket_website_configuration.react_app_website_configuration.website_domain}"
+}
+output "S3_WEBSITE_BUCKET" {
+  value = aws_s3_bucket.react_app.id
 }

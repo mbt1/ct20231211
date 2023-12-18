@@ -104,12 +104,7 @@ function App() {
           ))}
         </select>
       </div>
-      <div>
         <DisplayNotebook notebook={selectedFileURL} />
-      </div>
-      <div>
-        Download <a href={selectedFileURL}>{selectedFileURL.substring(bucket_url.length)}</a>.
-      </div>
     </div>
   );
 }
@@ -121,10 +116,20 @@ function DisplayNotebook(props) {
     return <></>
   }
   console.log(5,"is not NULL")
-  return <><JupyterNotebookViewer 
-              filePath={props.notebook} 
-              outputDarkTheme="true"
-              className = "NotebookViewer"
-            /></>
+  return (
+    <>
+      <div>
+        <JupyterNotebookViewer 
+            filePath={props.notebook} 
+            outputDarkTheme="true"
+            className = "NotebookViewer"
+        />
+      </div>
+      <div>
+        <span className='DownloadButton'>Download <a href={props.notebook}>{props.notebook.substring(bucket_url.length)}</a>.</span>
+      </div>
+    </>
+  )
+
 }
 export default App;
