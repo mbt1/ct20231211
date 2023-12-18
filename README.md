@@ -17,7 +17,9 @@ The entire prototype is hosted on AWS, using diverse products including
 - AWS Cloudfront
 - AWS Secret Manager
 
-All infrastructure (with the exception of the secret) is completely scripted using Terraform, using two seperate deployments for the two parts of this application (frontend and pipeline)
+All infrastructure (with the exception of the secret) is completely scripted using Terraform, using two seperate deployments for the two parts of this application (frontend and pipeline).
+
+All the development work can be done in the .devcontainer that is part of this repository. You will find all required tools, like the AWS CLI or Node.js preinstalled after starting up the .devcontainer in VSC.
 
 ### The Report Generator Pipeline
 
