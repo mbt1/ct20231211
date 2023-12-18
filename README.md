@@ -45,19 +45,19 @@ There are a few usefull development scripts directly in `data` as well as the `t
 
 #### Architecture Notes
 
-While some decisions might seem over the top for this small application, they were made with a more large-scale process in mind. For example, the application logic conatins synching logic for on of the sources to make sure files only get uploaded to the bucket if they are either new, or have changed. 
+While some decisions might seem over the top for this small application, they were made with a more large-scale process in mind. For example, the application conatins synching logic for on of the sources to make sure files only get uploaded to the bucket if they are either new, or have changed. 
 
-The state for this synching logic is saved in a separate file in the bucket, a decision that should be revisited, based on actual requirements. If provides more flexibility, but at the same time increases surface area for problems to appear. An alternative would be to use manually provided file meta-data in the bucket to maintain state. 
+The state for this synching logic is saved in a separate file in the bucket, a decision that should be revisited, based on actual requirements. If provides more flexibility, but at the same time increases surface area for problems to appear. An alternative would be to use additional file meta-data in the bucket to maintain state. 
 
 The synchronization logic is using a Pandas DataFrame. That is certainly over the top, unless you are dealing with multiple 100k of files. So it might make sense to rewrite this using simple built-in python constructs.
 
-The ECS Task to generate the report might not be needed. For small reports, the generation could be handled by the SQS listener lambda function. However, for larger reports, the 15-minute max execution time for lambda functions can be a problem. ECS Tasks do not have this limitation.
+The ECS Task to generate the report might not be needed. For small reports, the generation could be handled directly by the SQS listener lambda function. However, for larger reports, the 15-minute max execution time for lambda functions can be a problem. ECS Tasks do not have this limitation.
 
 ### The Report Viewer
 
 The report viewer is a simple React app that does not require a backend and therefore can be hosted on AWS S3 Websites. The parts involved here are several React typical files in the `frontent/public` and `frontend/src` folders. The main functionality lives in the `frontend/src/App.js` file. There is also a `frontend/terraform` folder that contains the code necessary for the infrastructure build.
 
-`App.js` makes use of a cascade of `useState` and `useEffect` hooks to facilitate the drop-down and the display of the reports. the drop-down is dynamically loaded based on the files in the `ct20231211-reports` bucket. Any change to the drop-down causes the app to load the new report and display it (read-only). There is also a download button if you want to further peruse the report.
+`App.js` makes use of a cascade of `useState` and `useEffect` hooks to facilitate the drop-down and the display of the reports. the drop-down is dynamically loaded based on the files in the `ct20231211-reports` bucket. Any change to the drop-down causes the app to load the new report and display it (read-only). There is also a download button displayed under the report if you want to further peruse it.
 
 The site is hosted as a static website on S3. Some caching as well as TLS is provided through cloudfront. At the time of this commit, the report viewer can be reached [here](https://dq96sqmscyf67.cloudfront.net/). However, that might change over time. 
 
@@ -71,9 +71,9 @@ You might notice that the `ct20231211-staging` bucket is also read enabled. That
 
 - Overall the app is following the least-privilege principle closely. However, to speed up the development time, a few shortcuts where taken. For example, the cloudfront setup allows for put and post access which does not make sense for a static site. Similarly, the CORS policy is rather wide open, something that should probably be revisited. Some of the internal policies might be able to be tightened up slightly, too.
 
-- The file synching at this time does not handle deletes. If that is needed, that functionality has to be added.
+- The file synching logic at this time does not handle deletes. If that is needed, that functionality has to be added.
 
-- One of the two data sources requires a contact email to be sent with every request. To not publish my email in this repository, I decided to put the email used in a secret. This secret is the only infrastructure item that is not managed through Terraform.
+- One of the two data sources requires a contact email to be sent with every request. To not publish my email in this repository, I decided to store the email address in a secret. This secret is the only infrastructure item that is not managed through Terraform.
 
 - The upload of the ECS Task container image to AWS ECR is handled through a so-called null-resource in Terraform. In general, you want to separate deployment from infrastructure creation. But in this case, I wanted to demonstrate that uploading a container image to a registry is possible in Terraform. Note - Terraform provides a docker resource that can do the same thing in a managed way. However, I do not believe it is possible to use it in the same .tf file that created the target ECR Repository.
 
