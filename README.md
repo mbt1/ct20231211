@@ -1,5 +1,5 @@
 # ct20231211
-## A Prototype for a reporting application 
+## A Prototype of a Reporting Application with associated Data Pipeline
 
 The application consists of 2 parts:
 
@@ -21,7 +21,7 @@ All infrastructure (with the exception of the secret) is completely scripted usi
 
 ### The Report Generator Pipeline
 
-There are several parts to this workflow:
+All the code for this pipeline lives in the `data` subfolder of the repository. There are several parts to this workflow:
 
 1. [File]`productivity/productivity.py`: A python function to check two API providers and download new data when available. This downloaded data is stored in the `ct20231211-staging` bucket. The function is deployed to AWS Lambda and automatically executed every 6 hours.
 
@@ -32,11 +32,22 @@ There are several parts to this workflow:
 1. [File]`reports/docker/*`: This combination of a container definition and a python function (`app.py`) takes the files in the `ct20231211-staging` bucket as input and generates a report in form of a Jupyter Notebook. The notbook, with all outputs valued, is then saved to the `ct20231211-reports` bucket.
 The example report contains simple data ingesting and cleaning steps, followed by some agregation and 'joins'.
 
+#### Files
+
+The `data` directory contains four folders:
+
+- `productivity`: Here you find all the required files for the `productivity` function that gets the API responses into the `ct20231211-staging` bucket.
+- `reports`: All files to facilitate the generation of the `.ipynb` reports using an ECS Task.
+- `sqslistener`: All files for the function that listens the bucket-change-notification queue.
+- `terraform`: The files needed to orchestrate the infrastructure build. Here you also find the definition for the parts of the application that do not require application code, like the SQS Queue.
+
+There are a few usefull development scripts directly in `data` as well as the `template.yml` needed to build and package the two functions in a way that can be deployed to AWS Lambda.
+
 #### Architecture Notes
 
-While some decisions might seem overkill for this small up, they were made with a larger process in mind. For example, files that exist in one of the sources only get uploaded to the bucket if they are either missing there, or have changed. 
+While some decisions might seem over the top for this small application, they were made with a more large-scale process in mind. For example, the application logic conatins synching logic for on of the sources to make sure files only get uploaded to the bucket if they are either new, or have changed. 
 
-The state is saved in a separate file in the bucket, a decision that should be revisited, based on actual requirements. If provides more flexibility, but at the same time increases surface area for problems to appear. An alternative would be to use manually provided file meta-data in the bucket to maintain state. 
+The state for this synching logic is saved in a separate file in the bucket, a decision that should be revisited, based on actual requirements. If provides more flexibility, but at the same time increases surface area for problems to appear. An alternative would be to use manually provided file meta-data in the bucket to maintain state. 
 
 The synchronization logic is using a Pandas DataFrame. That is certainly over the top, unless you are dealing with multiple 100k of files. So it might make sense to rewrite this using simple built-in python constructs.
 
@@ -44,7 +55,7 @@ The ECS Task to generate the report might not be needed. For small reports, the 
 
 ### The Report Viewer
 
-The report viewer is a simple React app that does not require a backend and therefore can be hosted on AWS S3 Websites. The parts involved here are several React typical files in the `frontent/public` and `frontend/src` folders. The main functionality lives in the `frontend/src/App.js` file.
+The report viewer is a simple React app that does not require a backend and therefore can be hosted on AWS S3 Websites. The parts involved here are several React typical files in the `frontent/public` and `frontend/src` folders. The main functionality lives in the `frontend/src/App.js` file. There is also a `frontend/terraform` folder that contains the code necessary for the infrastructure build.
 
 `App.js` makes use of a cascade of `useState` and `useEffect` hooks to facilitate the drop-down and the display of the reports. the drop-down is dynamically loaded based on the files in the `ct20231211-reports` bucket. Any change to the drop-down causes the app to load the new report and display it (read-only). There is also a download button if you want to further peruse the report.
 
